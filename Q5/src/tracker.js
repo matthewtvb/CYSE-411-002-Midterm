@@ -21,9 +21,17 @@ let currentFilter = "all";
 
 
 function loadDashboardState() {
-    const raw   = localStorage.getItem("dashboardState");
-    const state = JSON.parse(raw);             // No try/catch
-    currentFilter = state.filter;              // No enum validation
+    try {
+        const raw = localStorage.getItem("dashboardState");
+        const state = JSON.parse(raw);
+        if (ACCEPTED_FILTERS.includes(state.filter)) {
+            currentFilter = state.filter;
+        } else {
+            currentFilter = "all";
+        }
+    } catch (e) {
+        currentFilter = "all";
+    }
     applyFilter(currentFilter);
 }
 
@@ -37,9 +45,11 @@ function loadDashboardState() {
 
 function saveDashboardState() {
     const filterInput = document.getElementById("filter-select");
-    const filter      = filterInput.value;    // Not validated before storing
-    localStorage.setItem("dashboardState", JSON.stringify({ filter: filter }));
-    currentFilter = filter;
+    const filter = filterInput.value;
+    if (ACCEPTED_FILTERS.includes(filter)) {
+        localStorage.setItem("dashboardState", JSON.stringify({ filter: filter }));
+        currentFilter = filter;
+    }
 }
 
 
@@ -55,9 +65,17 @@ function saveDashboardState() {
 
 
 async function fetchIncidents() {
-    const res  = fetch("/api/incidents");      // Missing await
-    const data = res.json();                   // Missing await; res is a Promise
-    return data;
+    try {
+        const res = await fetch("/api/incidents");
+        if (!res.ok) {
+            throw new Error("HTTP error: " + res.status);
+        }
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        console.error("Failed to fetch incidents:", e);
+        return [];
+    }
 }
 
 
@@ -75,13 +93,33 @@ function renderIncidents(incidents) {
     const container = document.getElementById("incident-list");
     container.innerHTML = "";                  // Clear previous results
 
+    if (!Array.isArray(incidents)) {
+        const msg = document.createElement("p");
+        msg.textContent = "Error loading incidents.";
+        container.appendChild(msg);
+        return;
+    }
+
     incidents.forEach(function (incident) {
+        if (typeof incident.title !== "string" || incident.title === "") {
+            console.warn("Skipping invalid incident:", incident);
+            return;
+        }
+        if (!ACCEPTED_SEVERITIES.includes(incident.severity)) {
+            console.warn("Skipping invalid incident:", incident);
+            return;
+        }
+
         const item = document.createElement("li");
-        // UNSAFE – directly inserts API response as HTML
-        item.innerHTML =
-            "<strong>" + incident.title + "</strong>" +
-            " <span class='severity severity-" + incident.severity + "'>" +
-            incident.severity + "</span>";
+        const strong = document.createElement("strong");
+        const span = document.createElement("span");
+
+        strong.textContent = incident.title;
+        span.textContent = incident.severity;
+        span.className = "severity severity-" + incident.severity;
+
+        item.appendChild(strong);
+        item.appendChild(span);
         container.appendChild(item);
     });
 }
