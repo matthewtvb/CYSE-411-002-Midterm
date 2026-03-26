@@ -24,7 +24,7 @@ function loadDashboardState() {
     try {
         const raw = localStorage.getItem("dashboardState");
         const state = JSON.parse(raw);
-        if (ACCEPTED_FILTERS.includes(state.filter)) {
+        if (state && ACCEPTED_FILTERS.includes(state.filter)) {
             currentFilter = state.filter;
         } else {
             currentFilter = "all";
